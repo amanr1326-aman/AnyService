@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+ <odoo>
+   <record model="ir.ui.view" id="partner_anyservice_tree_view">
+       <field name="name">anyservice.partner.tree</field>
+       <field name="model">res.partner</field>
+       <field name="inherit_id" ref="base.view_partner_tree"/>
+       <field name="arch" type="xml">
+
+         <tree position="inside">
+            <field name="state"/>
+         </tree>
+         <tree position="attributes">
+           <attribute name="decoration-info">state=='draft'</attribute>
+           <attribute name="decoration-warning">state=='pending'</attribute>
+           <attribute name="decoration-danger">state=='banned'</attribute>
+         </tree>
+       </field>
+     </record>
+        <!-- Add instructor field to existing view -->
+        <record model="ir.ui.view" id="partner_anyservice_form_view">
+            <field name="name">anyservice.partner</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_partner_form"/>
+            <field name="arch" type="xml">
+              <xpath expr="//field[@name='category_id']" position="after">
+                <field name="is_anyservice_user" readonly="1" attrs="{'invisible':[('is_anyservice_user','!=',True)]}"/>
+                <field name="active_mode" attrs="{'invisible':['|',('is_anyservice_user','!=',True),('user_type','!=','agent')]}"/>
+                <field name="user_type" readonly="1" attrs="{'invisible':[('is_anyservice_user','!=',True)]}"/>
+              </xpath>
+              <xpath expr="//sheet" position="before">
+                <header attrs="{'invisible':[('is_anyservice_user','!=',True)]}">
+                  <button name="set_draft" string="Set to Draft" type="object" attrs="{'invisible':[('state','!=','banned'),('state','!=','approved')]}"/>
+                  <button name="submit" string="Submit" type="object" attrs="{'invisible':[('state','!=','draft')]}"/>
+                  <button name="approve" string="Approve" type="object" attrs="{'invisible':[('state','!=','pending')]}"/>
+                  <button name="ban_user" string="Ban User" type="object" attrs="{'invisible':[('state','!=','approved')]}"/>
+                  <field name="state" widget="statusbar" readonly="1"/>
+                </header>
+              </xpath>
+              <xpath expr="//page[@name='internal_notes']" position="after">
+                <page name="ekyc_service" string="e-KYC Details" attrs="{'invisible':['|',('is_anyservice_user','!=',True),('user_type','!=','agent')]}">
+                  <group string="e-KYC">
+                    <field name="aadhar_number"/>
+                    <field name="aadhar_front" widget="image"/>
+                    <field name="aadhar_back" widget="image"/>
+                  </group>
+                </page>
+                <page name="location" string="Location Details" attrs="{'invisible':[('is_anyservice_user','!=',True)]}">
+                  <group string="Location">
+                    <field name="place"/>
+                    <field name="lat"/>
+                    <field name="long"/>
+                    <field name="radius"/>
+                  </group>
+                </page>
+              </xpath>
+            </field>
+        </record>
+        <record id="anyservice_configuration_view" model="ir.ui.view">
+        <field name="name">Anyservice configuration</field>
+        <field name="model">anyservice.config.settings</field>
+        <field name="arch" type="xml">
+            <form string="Anyservice configuration" class="oe_form_configuration o_base_settings" js_class="base_settings">
+
+              <div class="o_control_panel">
+                  <div class="o_panel">
+                      <div class="title h2 mb0 mt4 text-muted d-none d-md-block">Settings</div>
+                  </div>
+                  <header>
+                      <button string="Save" type="object"
+                          name="execute" class="oe_highlight"/>
+                      or
+                      <button string="Discard" type="object"
+                          name="cancel" class="oe_link"/>
+                  </header>
+                </div>
+                <div class="o_setting_container">
+                    <div class="settings_tab"/>
+                    <div class="settings">
+                      <div class="app_settings_block" data-string="Any Service" string="Any Service" data-key="anyservice_settings">
+                          <h2>App Details</h2>
+
+                          <div class="col-12 col-lg-6 o_setting_box" id="anyservice">
+                              <div class="o_setting_right_pane">
+                                <group>
+                                  <field name="version"/>
+                                  <field name="description"/>
+                                  <field name="product_id"/>
+                                  <field name="journal_id"/>
+                                  <field name="invoice_journal_id"/>
+                                </group>
+                              </div>
+                          </div>
+                      </div>
+                    </div>
+                </div>
+            </form>
+        </field>
+    </record>
+
+        <record model="ir.actions.act_window" id="partner_agent_list_action">
+            <field name="name">Agents</field>
+            <field name="res_model">res.partner</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[('user_type','=','agent'),('is_anyservice_user','=',True)]</field>
+            <field name="context">{'default_is_anyservice_user':True,'default_user_type':'agent'}</field>
+        </record>
+
+        <record model="ir.actions.act_window" id="partner_client_list_action">
+            <field name="name">Clients</field>
+            <field name="res_model">res.partner</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[('user_type','=','client'),('is_anyservice_user','=',True)]</field>
+            <field name="context">{'default_is_anyservice_user':True,'default_user_type':'client'}</field>
+        </record>
+
+        <record id="anyservice_settings_action" model="ir.actions.act_window">
+            <field name="name">Anyservice configuration</field>
+            <field name="res_model">anyservice.config.settings</field>
+            <field name="view_id" ref="anyservice_configuration_view"/>
+            <field name="view_mode">form</field>
+            <field name="target">inline</field>
+        </record>
+
+        <menuitem id="anyservice_root" name="Anyservice"/>
+        <menuitem id="agent_menu" name="Agents"
+                  parent="anyservice_root"
+                  action="partner_agent_list_action"/>
+        <menuitem id="client_menu" name="Clients"
+                  parent="anyservice_root"
+                  action="partner_client_list_action"/>
+        <menuitem id="anyservice_configuration_menu" name="Configuration"
+                  parent="anyservice_root"/>
+        <menuitem id="anyservice_setting_menu" name="Settings"
+                  parent="anyservice_configuration_menu"
+                  action="anyservice_settings_action" sequence="1"/>
+
+</odoo>
