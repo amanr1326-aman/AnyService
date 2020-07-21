@@ -29,14 +29,20 @@ class AnyserviceNotification(models.Model):
         if vals.get('login'):
         	notifications = []
         	user = self.env['res.partner'].search([('id','=',decrypt(vals.get('login'))),('state','!=','banned'),('is_anyservice_user','=',True)],order="id desc")
-        	records = self.search([('partner_id','=',user.id),('read','=',False)])
+        	if vals.get('read'):
+        		records = self.search([('partner_id','=',user.id)],order="id desc")
+        	else:
+        		records = self.search([('partner_id','=',user.id),('read_notification','=',False)],order="id desc")
         	for record_id in records:
         		notifications.append({
 						'title':record_id.name,
 						'message':record_id.message,
-						'model':record_id.model_name,
-						'record':record_id.record_name,
+						'model':record_id.model_name or '',
+						'record':record_id.record_name or '',
+						'date':record_id.create_date.strftime('%a, %d %b %y\n%I:%M %p'),
 					})
+        		if not vals.get('read'):
+        			record_id.read_notification = True
         	return {
 				'result':'Success',
 				'notification':notifications

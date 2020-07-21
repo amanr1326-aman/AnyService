@@ -26,6 +26,8 @@
                 <field name="is_anyservice_user" readonly="1" attrs="{'invisible':[('is_anyservice_user','!=',True)]}"/>
                 <field name="active_mode" attrs="{'invisible':['|',('is_anyservice_user','!=',True),('user_type','!=','agent')]}"/>
                 <field name="user_type" readonly="1" attrs="{'invisible':[('is_anyservice_user','!=',True)]}"/>
+                <field name="rating" readonly="1" attrs="{'invisible':[('is_anyservice_user','!=',True)]}"/>
+                <field name="balance" readonly="1" attrs="{'invisible':[('is_anyservice_user','!=',True)]}"/>
               </xpath>
               <xpath expr="//sheet" position="before">
                 <header attrs="{'invisible':[('is_anyservice_user','!=',True)]}">

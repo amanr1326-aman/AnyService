@@ -30,6 +30,7 @@ def clean_str_data(data):
 class ResPartner(models.Model):
     _inherit = 'res.partner'
 
+
     is_anyservice_user = fields.Boolean('Anyservice User')
     active_mode = fields.Boolean('Active Mode')
     user_type = fields.Selection([('agent','Agent'),('client','Client')])
@@ -42,8 +43,10 @@ class ResPartner(models.Model):
     place = fields.Char('Place')
     lat = fields.Char('Latitude')
     long = fields.Char('Longitude')
+    rating = fields.Float('Rating',default=0)
 
     radius = fields.Integer('Service Distance', default=5)
+    balance = fields.Float('Balance')
 
     def set_draft(self):
         self.state='draft'
@@ -127,6 +130,12 @@ class ResPartner(models.Model):
                         'name':user.name,
                     }
                 else:
+                    if vals.get('rating'):
+                        rating = user.rating
+                        if rating:
+                            rating += vals.get('rating')
+                            rating = rating/2
+                            vals['rating'] = rating
                     values = vals
                     values.pop('login')
                     user.sudo().write(values)
@@ -172,7 +181,9 @@ class ResPartner(models.Model):
                         'result':'Success',
                         'name':user.name,
                         'radius':user.radius,
-                        'place':user.place
+                        'place':user.place,
+                        'agent':user.user_type=='agent',
+                        'active':user.active_mode,
                     }
             else:
                 return {
@@ -320,15 +331,16 @@ class ResPartner(models.Model):
                 'price':rec.price,
                 'is_measurable':rec.is_measurable,
                 'charge':round(cost),
+                'balance':abs(user.balance),
             })
         return {
             'result':'Success',
             'company':service_records[0].partner_id.parent_id.name,
-            'rating':service_records[0].partner_id.supplier_rank,
+            'rating':service_records[0].partner_id.rating,
             'categories':', '.join(set([rec.get('category') for rec in services])),
             'address':(service_records[0].partner_id.street+' '+service_records[0].partner_id.parent_id.street2+'\n'+service_records[0].partner_id.parent_id.city+' '+service_records[0].partner_id.parent_id.state_id.name+' '+str(service_records[0].partner_id.parent_id.zip)).replace('\n\n','\n').replace('  ',' ').strip(),
             'image':service_records[0].partner_id.parent_id.image_1920,
-            'services':services
+            'services':services,
         }
 
 
@@ -369,7 +381,7 @@ class ResPartner(models.Model):
                 'agent_id':rec.partner_id.id,
                 'category':rec.category_id.name,
                 'price':rec.price,
-                'rating':rec.partner_id.supplier_rank,
+                'rating':rec.partner_id.rating,
                 'company':rec.partner_id.parent_id.name,
                 'image':rec.partner_id.parent_id.image_1920,
                 'charge':round(cost),
@@ -388,7 +400,7 @@ class ResPartner(models.Model):
                     'agent_id':rec.partner_id.id,
                     'category':rec.category_id.name,
                     'price':rec.price,
-                    'rating':rec.partner_id.supplier_rank,
+                    'rating':rec.partner_id.rating,
                     'company':rec.partner_id.parent_id.name,
                     'image':rec.partner_id.parent_id.image_1920,
                     'charge':round(cost),

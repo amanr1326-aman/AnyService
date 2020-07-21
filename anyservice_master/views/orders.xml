@@ -48,10 +48,13 @@
                  <group string="Service details">
                    <field name="name"/>
                    <field name="customer_id"/>
+                   <field name="agent_id"/>
                    <field name="date"/>
                    <field name="gps_address"/>
                    <field name="full_address"/>
                    <field name="desc"/>
+                   <field name="rating"/>
+                   <field name="code"/>
                  </group>
                  <group string="Price Details">
                    <field name="other_charge"/>
