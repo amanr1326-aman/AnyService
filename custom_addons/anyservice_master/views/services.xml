@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+ <odoo>
+
+   <record model="ir.ui.view" id="anyservice_service_tree_view">
+       <field name="name">anyservice.service.tree</field>
+       <field name="model">anyservice.service</field>
+       <field name="arch" type="xml">
+         <tree>
+           <field name="name"/>
+           <field name="partner_id"/>
+           <field name="category_id"/>
+           <field name="price"/>
+         </tree>
+       </field>
+     </record>
+
+
+     <record model="ir.ui.view" id="anyservice_service_form_view">
+         <field name="name">anyservice.service</field>
+         <field name="model">anyservice.service</field>
+         <field name="arch" type="xml">
+           <form>
+             <sheet>
+              <field name="image" widget="image" class="oe_avatar"/>
+               <group>
+                 <group>
+                   <field name="name"/>
+                   <field name="partner_id"/>
+                   <field name="is_measurable"/>
+                   <field name="details"/>
+                 </group>
+                 <group>
+                   <field name="category_id"/>
+                   <field name="price"/>
+                   <field name="delivery_charge"/>
+                   <field name="rating"/>
+                 </group>
+               </group>
+             </sheet>
+           </form>
+         </field>
+       </record>
+
+   <record model="ir.ui.view" id="anyservice_category_tree_view">
+       <field name="name">anyservice.category.tree</field>
+       <field name="model">product.category</field>
+       <field name="inherit_id" ref="product.product_category_list_view"/>
+       <field name="arch" type="xml">
+         <tree position="inside">
+            <field name="state"/>
+         </tree>
+         <tree position="attributes">
+           <attribute name="decoration-info">state=='draft'</attribute>
+           <attribute name="decoration-warning">state=='pending'</attribute>
+           <attribute name="decoration-danger">state=='banned'</attribute>
+         </tree>
+       </field>
+     </record>
+
+     <record model="ir.ui.view" id="anyservice_category_form_view">
+         <field name="name">anyservice.category</field>
+         <field name="model">product.category</field>
+         <field name="inherit_id" ref="product.product_category_form_view"/>
+         <field name="arch" type="xml">
+           <xpath expr="//field[@name='parent_id']" position="replace">
+             <field name="parent_id" domain="[('is_anyservice_category','=',True)]"/>
+             <field name="is_anyservice_category"/>
+           </xpath>
+           <xpath expr="//sheet" position="before">
+             <header attrs="{'invisible':[('is_anyservice_category','!=',True)]}">
+               <button name="set_draft" string="Set to Draft" type="object" attrs="{'invisible':[('state','!=','banned'),('state','!=','approved')]}"/>
+               <button name="submit" string="Submit" type="object" attrs="{'invisible':[('state','!=','draft')]}"/>
+               <button name="approve" string="Approve" type="object" attrs="{'invisible':[('state','!=','pending')]}"/>
+               <button name="ban_user" string="Ban" type="object" attrs="{'invisible':[('state','!=','approved')]}"/>
+               <field name="state" widget="statusbar" readonly="1"/>
+             </header>
+           </xpath>
+         </field>
+       </record>
+       <record id="product_category_anyservice_action_form" model="ir.actions.act_window">
+         <field name="name">Anyservice Categories</field>
+         <field name="type">ir.actions.act_window</field>
+         <field name="res_model">product.category</field>
+         <field name="search_view_id" ref="product.product_category_search_view"/>
+         <field name="view_id" ref="anyservice_category_tree_view"/>
+         <field name="domain">[('is_anyservice_category','=',True)]</field>
+         <field name="context">{'default_is_anyservice_category':True}</field>
+        </record>
+        <record id="service_anyservice_action_form" model="ir.actions.act_window">
+          <field name="name">Anyservice Service</field>
+          <field name="res_model">anyservice.service</field>
+          <field name="type">ir.actions.act_window</field>
+          <field name="view_mode">tree,form</field>
+          <field name="view_id" ref="anyservice_master.anyservice_service_tree_view"/>
+        </record>
+
+        <!-- <menuitem id="anyservice_service_menu" name="Service"
+                  parent="anyservice_root" sequence="3"/> -->
+        <menuitem id="anyservice_service_child_menu" name="Service"
+                  parent="anyservice_configuration_menu"
+                  action="service_anyservice_action_form"/>
+        <menuitem id="anyservice_category_menu" name="Service category"
+                  parent="anyservice_configuration_menu"
+                  action="product_category_anyservice_action_form"/>
+
+</odoo>

@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+ <odoo>
+
+   <record model="ir.ui.view" id="anyservice_order_tree_view">
+       <field name="name">anyservice.order.tree</field>
+       <field name="model">anyservice.order</field>
+       <field name="arch" type="xml">
+         <tree decoration-info="state=='draft'" decoration-warning="state=='pending'" decoration-danger="state=='cancel'" >
+           <field name="name"/>
+           <field name="customer_id"/>
+           <field name="total_price"/>
+           <field name="date"/>
+           <field name="state"/>
+         </tree>
+       </field>
+     </record>
+
+
+     <record model="ir.ui.view" id="anyservice_order_form_view">
+         <field name="name">anyservice.order</field>
+         <field name="model">anyservice.order</field>
+         <field name="arch" type="xml">
+           <form>
+             <header>
+               <button name="print_invoice" class="oe_highlight" string="Print" type="object" attrs="{'invisible':[('state','not in',['paid'])]}"/>
+               <button name="set_draft" string="Set to Draft" type="object" attrs="{'invisible':[('state','not in',['cancel','done'])]}"/>
+               <button name="submit" string="Submit" type="object" attrs="{'invisible':[('state','!=','draft')]}"/>
+               <button name="accept" string="Accept" type="object" attrs="{'invisible':[('state','!=','pending')]}"/>
+               <button name="progress" string="In Progress" type="object" attrs="{'invisible':[('state','!=','accepted')]}"/>
+               <button name="done" string="Done" type="object" attrs="{'invisible':[('state','!=','progress')]}"/>
+               <button name="cancel" string="Cancel" type="object" attrs="{'invisible':[('state','in',['done','draft','paid'])]}"/>
+               <button name="pay" string="Pay" type="object" attrs="{'invisible':[('state','!=','done')]}"/>
+               <field name="state" widget="statusbar" readonly="1"/>
+             </header>
+             <sheet>
+               <div class="oe_button_box" name="button_box" attrs="{'invisible': [('state', '!=', 'paid')]}">
+                 <button type="object" class="oe_stat_button" icon="fa-pencil-square-o" name="open_invoice" context="{'default_id': invoice_id}">
+                     <div class="o_form_field o_stat_info">
+                         <span class="o_stat_value">
+                             <field name="total_price" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                         </span>
+                         <span class="o_stat_text">Invoiced</span>
+                     </div>
+                 </button>
+               </div>
+
+                 <widget name="web_ribbon" title="Paid" attrs="{'invisible': [('state', '!=', 'paid')]}"/>
+               <group>
+                 <group string="Service details">
+                   <field name="name"/>
+                   <field name="customer_id"/>
+                   <field name="agent_id"/>
+                   <field name="date"/>
+                   <field name="gps_address"/>
+                   <field name="full_address"/>
+                   <field name="desc"/>
+                   <field name="rating"/>
+                   <field name="code"/>
+                 </group>
+                 <group string="Price Details">
+                   <field name="other_charge"/>
+                   <field name="total_price"/>
+                   <field name="invoice_id" invisible="1"/>
+                 </group>
+               </group>
+               <notebook>
+                 <page string="Services">
+                    <field name="service_ids" widget="one2many">
+                        <tree editable="bottom" >
+                            <field name="service_id" options='{"no_create_edit": True, "no_create" : True, "no_open": True, "no_quick_create": True}'/>
+                            <field name="name"/>
+                            <field name="partner_id" options='{"no_create_edit": True, "no_create" : True, "no_open": True, "no_quick_create": True}'/>
+                            <field name="price"/>
+                            <field name="quantity"/>
+                            <field name="total_price" />
+                        </tree>
+                    </field>
+                 </page>
+                 <page string="Remarks">
+                    <field name="remarks" readonly="1" nolabel="1">
+                        <tree create="false" edit="false" delete="false">
+                            <field name="action"/>
+                            <field name="date"/>
+                            <field name="remark" />
+                            <field name="partner_id" options='{"no_create_edit": True, "no_create" : True, "no_open": True, "no_quick_create": True}'/>
+                        </tree>
+                    </field>
+                 </page>
+               </notebook>
+             </sheet>
+           </form>
+         </field>
+       </record>
+
+
+        <record id="order_anyservice_action_form" model="ir.actions.act_window">
+          <field name="name">Anyservice order</field>
+          <field name="res_model">anyservice.order</field>
+          <field name="type">ir.actions.act_window</field>
+          <field name="view_mode">tree,form</field>
+          <field name="view_id" ref="anyservice_master.anyservice_order_tree_view"/>
+        </record>
+
+        <!-- <menuitem id="anyservice_service_menu" name="Service"
+                  parent="anyservice_root" sequence="3"/> -->
+        <menuitem id="anyservice_order_menu" name="Orders"
+                  parent="anyservice_root"
+                  sequence="1"
+                  action="order_anyservice_action_form"/>
+
+</odoo>
