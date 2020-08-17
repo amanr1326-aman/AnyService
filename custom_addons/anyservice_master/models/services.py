@@ -65,6 +65,7 @@ class AnyserviceService(models.Model):
     image_512 = fields.Image("Image 512", related="image", max_width=512, max_height=512, store=True)
     image_256 = fields.Image("Image 256", related="image", max_width=256, max_height=256, store=True)
     image_128 = fields.Image("Image 128", related="image", max_width=128, max_height=128, store=True)
+    variant_ids = fields.One2many('service.variant','service_id',string='Variants')
 
     def create_service(self,vals):
         clean_str_data(vals)
@@ -83,13 +84,17 @@ class AnyserviceService(models.Model):
                     'delivery_charge':vals.get('delivery_charge'),
                     'details':vals.get('description')
                 })
-            self.env['anyservice.notification'].sudo().create({
+            print(vals.get('variants'))
+            for items in vals.get('variants',[]):
+                self.env['service.variant'].sudo().create({'name':items.get('name'),'value':items.get('value'),'service_id':service_id.id})
+            notification = self.env['anyservice.notification'].create({
                     'name':vals.get('name'),
                     'message':'Your Service/Product is created and Approved',
                     'model_name':'anyservice.service',
                     'record_name':service_id.id,
-                    'partner_id':id,
+                    'partner_id':user.id,
                 })
+            notification.send_notification(user.fcm_token)
             return {
                 'result':'Success',
                 'msg':'Service/Product Created'
@@ -102,15 +107,17 @@ class AnyserviceService(models.Model):
     def delete_service(self,vals):
         clean_str_data(vals)
         id = decrypt(vals.get('login'))
+        user = self.env['res.partner'].search([('id','=',id),('is_anyservice_user','=',True)])
         service_id = self.sudo().search([('id','=',vals.get('id'))])
         if service_id:
-            self.env['anyservice.notification'].sudo().create({
+            notification = self.env['anyservice.notification'].create({
                 'name':service_id.name,
                 'message':'Your Service/Product is deleted',
                 'model_name':'anyservice.service',
                 'record_name':service_id.id,
                 'partner_id':id,
             })
+            notification.send_notification(user.fcm_token)
             service_id.unlink()
             return {
                 'result':'Success',
@@ -124,9 +131,24 @@ class AnyserviceService(models.Model):
 
     def load_image(self,vals):
         clean_str_data(vals)
-        service_id = self.sudo().search([('id','=',vals.get('id'))])
-        return {
+        if vals.get('order_id'):
+            order_id = self.env['anyservice.order'].sudo().search([('id','=',vals.get('order_id'))])
+            return {
+            'result':'Success',
+            'image':order_id.service_ids[0].service_id.image or order_id.agent_id.parent_id.image_1920,
+            }
+
+        else:
+            service_id = self.sudo().search([('id','=',vals.get('id'))])
+            return {
             'result':'Success',
             'image':service_id.image,
-        }
+            }
 
+
+class ServiceVariant(models.Model):
+    _name='service.variant'
+
+    name = fields.Char()
+    value = fields.Char()
+    service_id = fields.Many2one('anyservice.service')

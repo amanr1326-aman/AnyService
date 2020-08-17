@@ -53,6 +53,7 @@ class ResPartner(models.Model):
     aadhar_back = fields.Binary(string="Aadhar Back Image")
 
     place = fields.Char('Place')
+    fcm_token = fields.Text('FCM Token')
     lat = fields.Char('Latitude')
     long = fields.Char('Longitude')
     rating = fields.Float('Rating',default=0)
@@ -125,6 +126,19 @@ class ResPartner(models.Model):
                 'code':101,
                 'msg':'New User'
             }
+
+
+    def set_token(self,vals):
+        clean_str_data(vals)
+        if vals.get('login'):
+            user = self.search([('id','=',decrypt(vals.get('login'))),('state','!=','banned'),('is_anyservice_user','=',True)])
+            if user and vals.get('token'):
+                user.sudo().fcm_token = vals.get('token')
+        return {
+            'result':'Success',
+            'msg':'Success'
+        }
+        
 
     def update_user_details(self,vals):
         clean_str_data(vals)
@@ -309,9 +323,9 @@ class ResPartner(models.Model):
                 company_data['street2'] = vals.get('street2','')
                 company_data['city'] = vals.get('city','')
                 company_data['is_company'] = True
-                company_data['zip'] = vals.get('pin')
-                company_data['vat'] = vals.get('gst')
-                company_data['image_1920'] = vals.get('logo')
+                company_data['zip'] = vals.get('pin','')
+                company_data['vat'] = vals.get('gst','')
+                company_data['image_1920'] = vals.get('logo','')
                 company_data['country_id'] = self.env['res.country'].search([('name','=','India')])[0].id
                 company_data['state_id'] = self.env['res.country.state'].search([('name','=',vals.get('state'))])[0].id
                 company_id = self.env['res.partner'].sudo().create(company_data)
@@ -379,11 +393,17 @@ class ResPartner(models.Model):
                     cost = rec.partner_id.unlimted_distance_charge
                 else:
                     cost = 10+4*(distance.distance((user.lat,user.long),(rec.partner_id.lat,rec.partner_id.long)).km)
+            variants=[]
+            for variant in rec.variant_ids:
+                variants.append({
+                        variant.name:variant.value
+                    })
             services.append({
                 'id':rec.id,
                 'name':rec.name,
                 'company':rec.partner_id.parent_id.name,
                 'verified':rec.partner_id.verified,
+                'variants':variants,
                 'image':rec.image_512 or '',
                 'rating':rec.rating,
                 'agent_id':rec.partner_id.id,
@@ -424,7 +444,9 @@ class ResPartner(models.Model):
         clean_str_data(vals)
         id = decrypt(vals.get('login'))
         user = self.search([('id','=',id),('is_anyservice_user','=',True)])
-        domain = ['&']
+        domain = []
+        if vals.get('categ')!='All':
+            domain = ['&']
         services = []
         if vals.get('key'):
             domain.append('|')
@@ -433,7 +455,7 @@ class ResPartner(models.Model):
             domain.append(('details','ilike',vals.get('key')))
         categ = vals.get('categ')
         category_ids = False
-        if categ:
+        if categ and categ!='All':
             category_id = self.env['product.category'].search([('name','=',categ),('is_anyservice_category','=',True),('state','=','approved')])
             if vals.get('key'):
                 category_ids = self.env['product.category'].search(['&','&','|','|',('name','=',categ),('id','child_of',category_id.ids),('name','ilike',vals.get('key')),('is_anyservice_category','=',True),('state','=','approved')])
@@ -443,7 +465,8 @@ class ResPartner(models.Model):
             category_ids = self.env['product.category'].search([('name','ilike',vals.get('key')),('is_anyservice_category','=',True),('state','=','approved')])
 
         
-        domain.append(('category_id','in',category_ids.ids))
+        if categ!='All':
+            domain.append(('category_id','in',category_ids.ids))
         partner_ids = self.env['res.partner'].search([('active_mode','=',True),('is_anyservice_user','=',True),('state','=','approved'),('user_type','=','agent')])
         temp_partner_ids = partner_ids
         partner_ids = partner_ids.filtered(lambda x:check_distance(float(user.lat),float(user.long),float(x.lat),float(x.long),min(user.radius,x.radius)) or x.unlimted_distance ==True)
@@ -456,11 +479,17 @@ class ResPartner(models.Model):
                     cost = rec.partner_id.unlimted_distance_charge
                 else:
                     cost = 10+4*(distance.distance((user.lat,user.long),(rec.partner_id.lat,rec.partner_id.long)).km)
+            variants=[]
+            for variant in rec.variant_ids:
+                variants.append({
+                        variant.name:variant.value
+                    })
             services.append({
                 'id':rec.id,
                 'name':rec.name,
                 'image':rec.image_512 or '',
                 'agent_id':rec.partner_id.id,
+                'variants':variants,
                 'verified':rec.partner_id.verified,
                 'category':rec.category_id.name,
                 'price':rec.price,
@@ -482,6 +511,11 @@ class ResPartner(models.Model):
                         cost = rec.partner_id.unlimted_distance_charge
                     else:
                         cost = 10+4*(distance.distance((user.lat,user.long),(rec.partner_id.lat,rec.partner_id.long)).km)
+                variants=[]
+                for variant in rec.variant_ids:
+                    variants.append({
+                        variant.name:variant.value
+                        })
                 services.append({
                     'id':rec.id,
                     'name':rec.name,
@@ -490,6 +524,7 @@ class ResPartner(models.Model):
                     'verified':rec.partner_id.verified,
                     'category':rec.category_id.name,
                     'price':rec.price,
+                    'variants':variants,
                     'rating':rec.rating,
                     'company':rec.partner_id.parent_id.name,
                     'charge':round(cost),
@@ -591,13 +626,14 @@ class AnyserviceServiceChilds(models.Model):
                             'total':user.sudo().balance,
                             'name':'Payment Successfull by online '+payment_id[0].sudo().name
                         })
-                    self.env['anyservice.notification'].create({
+                    notification = self.env['anyservice.notification'].create({
                                 'name':'Payment recieved',
                                 'message':'Online Payment'+' of amount '+str(payment_id[0].sudo().amount)+' recieved Successfully.\nPlease use the following reference for your payment in future -'+payment_id[0].sudo().name,
                                 'model_name':'anyservice.transaction',
                                 'record_name':'',
                                 'partner_id':user.id,
                             })
+                    notification.send_notification(user.fcm_token)
                     return {
                         'result':'Success',
                         'msg':'Payment posted Successfully.'
@@ -666,7 +702,7 @@ class AnyserviceServiceChilds(models.Model):
             # print(payment_link.link)
             return {
                 'result':'Success',
-                'link':payment_link.link,
+                'link':payment_link.link.replace('8069','8079'),
             }
         else:
             return{

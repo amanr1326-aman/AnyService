@@ -74,21 +74,23 @@ class AnyserviceOrder(models.Model):
             'date':datetime.datetime.now()
 
         })
-        self.env['anyservice.notification'].create({
+        notification = self.env['anyservice.notification'].create({
                 'name':'Order '+self.name,
                 'message':msg+'\n'+self.desc+' ('+STATES[self.state]+')',
                 'model_name':'anyservice.order',
                 'record_name':self.id,
                 'partner_id':self.customer_id.id,
             })
+        notification.send_notification(self.customer_id.fcm_token)
         if partner_id.id != self.service_ids[0].partner_id.id or self.state=='paid':
-            self.env['anyservice.notification'].create({
+            notification = self.env['anyservice.notification'].create({
                     'name':'Order '+self.name,
                     'message':msg+'\n'+self.desc+' ('+STATES[self.state]+')',
                     'model_name':'anyservice.order',
                     'record_name':self.id,
                     'partner_id':self.service_ids[0].partner_id.id,
                 })
+            notification.send_notification(partner_id.fcm_token)
 
     def open_invoice(self):
         return {
@@ -382,20 +384,22 @@ class AnyserviceOrder(models.Model):
                                     'total':order.agent_id.sudo().balance,
                                     'name':'Pending bill charges from user for '+order.name
                                     })
-                        self.env['anyservice.notification'].create({
+                        notification = self.env['anyservice.notification'].create({
                                 'name':'Order '+order.name,
                                 'message':'Online Payment recieved Successfully.\nPlease use the following reference for your payment in future -'+payment_id[0].sudo().name,
                                 'model_name':'anyservice.order',
                                 'record_name':order.id,
                                 'partner_id':order.customer_id.id,
                             })
-                        self.env['anyservice.notification'].create({
+                        notification.send_notification(user.fcm_token)
+                        notification= self.env['anyservice.notification'].create({
                                 'name':'Order '+order.name,
                                 'message':'Online Payment recieved Successfully from customer.\nMoney is added to your wallet and same will be added to your account within 5 working days.\nPlease use the following reference for your payment in future -'+payment_id[0].sudo().name,
                                 'model_name':'anyservice.order',
                                 'record_name':order.id,
                                 'partner_id':order.agent_id.id,
                             })
+                        notification.send_notification(user.fcm_token)
                         order.add_remark("Online Payment Received with payment no. "+payment_id[0].sudo().name,order.customer_id)
                         return {
                             'result':'Success',
@@ -422,9 +426,9 @@ class AnyserviceOrder(models.Model):
             user = self.env['res.partner'].search([('id','=',decrypt(vals.get('login'))),('state','!=','banned'),('is_anyservice_user','=',True)])   
             service_ids = []
             for val in list(vals.get('services')):
-                service = self.env['anyservice.service'].sudo().search([('id','=',val.get('id'))])
-                service_id = self.env['anyservice.order.child'].sudo().create({'name':service[0].sudo().name,'service_id':val.get('id'),'quantity':val.get('quantity')})
-                service_id.onchangeservice()
+                service = self.env['anyservice.service'].sudo().search([('id','=',int(val.get('id')))])
+                service_id = self.env['anyservice.order.child'].sudo().create({'name':val.get('variant') if val.get('variant') else service[0].sudo().name,'service_id':int(val.get('id')),'quantity':int(val.get('quantity')),'price':service[0].sudo().price})
+                # service_id.onchangeservice()
                 service_id._compute_price()
                 service_ids.append(service_id.id)
                 agent_id = service_id.partner_id.id
@@ -463,13 +467,14 @@ class AnyserviceOrder(models.Model):
             letters = "1234567890"
             code = ''.join(random.choice(letters) for i in range(6))
             order.code = code
-            self.env['anyservice.notification'].create({
+            notification = self.env['anyservice.notification'].create({
                     'name':'Order '+order.name,
                     'message':'CODE - '+code+'\nPlease share this code with Agent only when agent will visit your home to start service.',
                     'model_name':'anyservice.order',
                     'record_name':order.id,
                     'partner_id':order.customer_id.id,
                 })
+            notification.send_notification(user.fcm_token)
             return {
                 'result':'Success',
                 'order_id':order.name,
@@ -490,24 +495,24 @@ class AnyserviceOrder(models.Model):
                     if int(vals.get('login')) != last_action_partner.id:
                         order_id.updated = False
                         if order_id.service_ids and order_id.date:
-                            if order_id.service_ids[0].partner_id:
+                            if order_id.agent_id:
                                 orders.append({
                                     'id':order_id.id,
                                     'name':order_id.name,
                                     'order_date':convertdatetolocal(self.env.user.tz or pytz.utc,order_id.date),
                                     'final_date':convertdatetolocal(self.env.user.tz or pytz.utc,order_id.remarks[len(order_id.remarks)-1].date) if order_id.remarks else convertdatetolocal(self.env.user.tz or pytz.utc,order_id.date),
                                     'cust_id':order_id.customer_id.id,
-                                    'agent_id':order_id.service_ids[0].partner_id.id,
+                                    'agent_id':order_id.agent_id.id,
                                     'cust_name':order_id.customer_id.name,
-                                    'agent_name':order_id.service_ids[0].partner_id.parent_id.name,
+                                    'agent_name':order_id.agent_id.parent_id.name,
                                     'description':order_id.desc or '',
                                     'gps_address':order_id.gps_address or '',
                                     'full_address':order_id.full_address or '',
                                     'state':STATES[order_id.state],
                                     'total_price':order_id.total_price,
-                                    'image':order_id.service_ids[0].service_id.image_128,
+                                    'image':order_id.service_ids[0].service_id.image_128 or order_id.agent_id.parent_id.image_128,
                                     'cust_phone':order_id.customer_id.phone,
-                                    'agent_phone':order_id.service_ids[0].partner_id.phone,
+                                    'agent_phone':order_id.agent_id.phone,
                                     'rating':order_id.rating,
                                     'invoice_id':order_id.invoice_id.id or 0,
                                     'code':order_id.code,
@@ -525,24 +530,24 @@ class AnyserviceOrder(models.Model):
             order_ids = self.search([('customer_id' if user.user_type=='client' else 'agent_id','=',user.id),('state','in',['paid','cancel'])],order="id desc",offset=vals.get('offset',0),limit=vals.get('limit',50))
             for order_id in order_ids:
                 if order_id.service_ids and order_id.date:
-                    if order_id.service_ids[0].partner_id:
+                    if order_id.agent_id:
                         orders.append({
                             'id':order_id.id,
                             'name':order_id.name,
                             'order_date':convertdatetolocal(self.env.user.tz or pytz.utc,order_id.date),
                             'final_date':convertdatetolocal(self.env.user.tz or pytz.utc,order_id.remarks[len(order_id.remarks)-1].date) if order_id.remarks else convertdatetolocal(self.env.user.tz or pytz.utc,order_id.date),
                             'cust_id':order_id.customer_id.id,
-                            'agent_id':order_id.service_ids[0].partner_id.id,
+                            'agent_id':order_id.agent_id.id,
                             'cust_name':order_id.customer_id.name,
-                            'agent_name':order_id.service_ids[0].partner_id.parent_id.name,
+                            'agent_name':order_id.agent_id.parent_id.name,
                             'description':order_id.desc or '',
                             'gps_address':order_id.gps_address or '',
                             'full_address':order_id.full_address or '',
                             'state':STATES[order_id.state],
                             'total_price':order_id.total_price,
-                            'image':order_id.service_ids[0].service_id.image_128,
+                            'image':order_id.service_ids[0].service_id.image_128 or order_id.agent_id.parent_id.image_128,
                             'cust_phone':order_id.customer_id.phone,
-                            'agent_phone':order_id.service_ids[0].partner_id.phone,
+                            'agent_phone':order_id.agent_id.phone,
                             'rating':order_id.rating,
                             'invoice_id':order_id.invoice_id.id or 0,
                             'code':order_id.code,
@@ -581,24 +586,24 @@ class AnyserviceOrder(models.Model):
             order_ids = self.search([('customer_id' if user.user_type=='client' else 'agent_id','=',user.id),('state','not in',['paid','cancel'])],order="id desc",offset=vals.get('offset',0),limit=vals.get('limit',50))
             for order_id in order_ids:
                 if order_id.service_ids and order_id.date:
-                    if order_id.service_ids[0].partner_id:
+                    if order_id.agent_id:
                         orders.append({
                             'id':order_id.id,
                             'name':order_id.name,
                             'order_date':convertdatetolocal(self.env.user.tz or pytz.utc,order_id.date),
                             'final_date':convertdatetolocal(self.env.user.tz or pytz.utc,order_id.remarks[len(order_id.remarks)-1].date) if order_id.remarks else convertdatetolocal(self.env.user.tz or pytz.utc,order_id.date),
                             'cust_id':order_id.customer_id.id,
-                            'agent_id':order_id.service_ids[0].partner_id.id,
+                            'agent_id':order_id.agent_id.id,
                             'cust_name':order_id.customer_id.name,
-                            'agent_name':order_id.service_ids[0].partner_id.parent_id.name,
+                            'agent_name':order_id.agent_id.parent_id.name,
                             'description':order_id.desc or '',
                             'gps_address':order_id.gps_address or '',
                             'full_address':order_id.full_address or '',
                             'state':STATES[order_id.state],
                             'total_price':order_id.total_price,
-                            'image':order_id.service_ids[0].service_id.image_128,
+                            'image':order_id.service_ids[0].service_id.image_128 or order_id.agent_id.parent_id.image_128,
                             'cust_phone':order_id.customer_id.phone,
-                            'agent_phone':order_id.service_ids[0].partner_id.phone,
+                            'agent_phone':order_id.agent_id.phone,
                             'rating':order_id.rating,
                             'invoice_id':order_id.invoice_id.id or 0,
                             'code':order_id.code,
@@ -650,11 +655,13 @@ class AnyserviceOrder(models.Model):
 
     def create_notification(self,vals):
         clean_str_data(vals)
-        self.env['anyservice.notification'].sudo().create({
+        user = self.env['res.partner'].search([('id','=',id),('is_anyservice_user','=',True)])
+        notification = self.env['anyservice.notification'].sudo().create({
                 'name':vals.get('name'),
                 'message':vals.get('msg'),
                 'partner_id':vals.get('id'),
             })
+        notification.send_notification(user.fcm_token)
         return {
             'result':'Success',
             'msg':'User Notified'
@@ -680,7 +687,7 @@ class AnyserviceOrder(models.Model):
             payment_link.sudo().check_token(payment_link.access_token,payment_link.partner_id,payment_link.amount,payment_link.currency_id)
             return {
                 'result':'Success',
-                'link':payment_link.link,
+                'link':payment_link.link.replace('8069','8079'),
             }
         else:
             return{
@@ -691,6 +698,7 @@ class AnyserviceOrder(models.Model):
         tag = ''
         clean_str_data(vals)
         user_id = int(decrypt(vals.get('login')))
+        user = self.env['res.partner'].search([('id','=',user_id),('is_anyservice_user','=',True)])
         order_id = self.search([('id','=',int(vals.get('id')))])
         if user_id == order_id.customer_id.id:
             tag = 'Message From Customer'
@@ -705,11 +713,12 @@ class AnyserviceOrder(models.Model):
             'date':datetime.datetime.now()
 
         })
-        self.env['anyservice.notification'].sudo().create({
+        notification = self.env['anyservice.notification'].sudo().create({
                 'name':tag+' for order '+order_id.name,
                 'message':vals.get('msg'),
                 'partner_id': order_id.agent_id.id if user_id==order_id.customer_id.id else order_id.customer_id.id,
             })
+        notification.send_notification(order_id.agent_id.fcm_token if user_id==order_id.customer_id.id else order_id.customer_id.fcm_token)
         return {
             'result':'Success',
             'msg':'Sent',

@@ -36,6 +36,13 @@
                    <field name="rating"/>
                  </group>
                </group>
+
+              <field name="variant_ids" widget="one2many">
+                  <tree editable="bottom" >
+                      <field name="name"/>
+                      <field name="value"/>
+                  </tree>
+              </field>
              </sheet>
            </form>
          </field>

@@ -4,6 +4,9 @@ STATES = {
     'draft':'Draft','pending':'Pending From Agent','accepted':'Accepted By Agent','progress':'In Progress','done':'Awaiting Payment','paid':'Paid','cancel':'Cancelled','Message From Agent':'Message From Agent','Message From Customer':'Message From Customer'
 }
 
+import requests
+import json
+
 
 
 import pytz
@@ -37,7 +40,29 @@ class AnyserviceNotification(models.Model):
     message = fields.Text(required=True)
     read_notification = fields.Boolean()
     model_name = fields.Char()
+    response = fields.Text()
     record_name = fields.Integer()
+
+
+    def send_notification(self,fcm_token=False):
+    	serverToken = 'AAAAYfNc-Z4:APA91bEnxdem8P7oQnyYd8texxhY8o4ndot3cGDLtfkcXr6j1qBe83K1iHgKFqMK8OMG1ktgmYnhnGaHsOW2HmcM0TMeImni5WJwDq8Ppa8v4FpKwEgKcUvnE9s-rrilqv7F11FOlhis'
+    	deviceToken = fcm_token or self.partner_id.fcm_token
+    	if deviceToken:
+	    	headers = {'Content-Type': 'application/json','Authorization': 'key=' + serverToken,}
+	    	# body = {'collapse_key':'Any Service','priority':'high','ttl':'1s','notification': {'title': self.name,'body': self.message,},'to':deviceToken,'android':{'priority': 'high','ttl':'1s'},'webpush':{'urgency':'high','TTL':'1s'}}
+	    	body = {'notification': {'title': self.name,'body': self.message,},'to':deviceToken,}
+	    	#   'data': dataPayLoad,
+	    	# print(body)
+	    	response = requests.post("https://fcm.googleapis.com/fcm/send",headers = headers, data=json.dumps(body), verify=False)
+	    	# print(response.text)
+	    	self.response = str(response.text)
+	    	self.read_notification = True
+    	# push_service = FCMNotification(api_key="AAAAYfNc-Z4:APA91bFR3TlT9ofi_PmQm5fgkkxvWE6g1aBwm1ns9QnZ-UsMDzc3Anm06qq6KM8vlgNGkEOWQfcQESL8sSM7RCouC9o0sFdatZ_Y6IszIeQq8fNy0gEZdj1W81szSmQUWEX5axG4fn4U")
+    	# result = push_service.notify_single_device(registration_id="elOqcKdZSSiirwjmn7oLOE:APA91bH8l4f7_CgbJ3V0JBsmmlO8TFklLTUWC3ovhMhysL3BNoT4kZsshcGfU-j4wVX2ST57HporzwvEZprOEIRpfzVq_aKSoo-lTacFRbva9fgDG5aW0yiyGYipo6usiF4kjs4dfKjw", message_title=self.name, message_body=self.message)
+    	# print(response.text)
+    	# self.response = str(response.text)
+    	# self.read_notification = True
+
 
     def get_user_notification(self,vals):
         clean_str_data(vals)
@@ -91,3 +116,16 @@ class AnyserviceNotification(models.Model):
 				'result':'Success',
 				'notification':notifications
 			}
+
+	# def clear_notifications(self,vals):
+	# 	clean_str_data(vals)
+	# 	if vals.get('login'):
+	# 		records = []
+	# 		user = self.env['res.partner'].search([('id','=',decrypt(vals.get('login'))),('state','!=','banned'),('is_anyservice_user','=',True)],order="id desc")
+	# 		records = self.search([('partner_id','=',user.id),('read_notification','=',True)],limit=vals.get('limit',50))
+	# 		records.sudo().unlink()
+	# 	return {
+	# 	'result':'Success',
+	# 	'msg':'Done'
+	# 	}
+        	
